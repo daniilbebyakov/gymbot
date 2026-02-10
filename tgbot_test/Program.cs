@@ -14,14 +14,27 @@ internal class Program
         gymbot.OnMessage += OnMessage;
         Console.ReadLine(); 
     }
-    string connection = "Host=localhost;Port=5432;Username=gymbotuser;Password=gymbotpass;Database=gymbot_db";
 
     static UserRepository Users = new UserRepository();
     private static async void OnMessage(ITelegramBotClient client, Update update)
     {
         if (update.Message == null) return;
-        await Users.AddUser(update.Message.Chat.Id, update.Message.From?.Username);
-        await client.SendMessage(update.Message.Chat.Id, "Теперь ты в файлах Эйпштена, пидар.");
-        await client.SendMessage(update.Message?.Chat.Id ?? 445584914, update.Message?.Text?? "[не текст]");
+        string usermessage = update.Message.Text ?? "";
+        switch (usermessage)
+        {
+            case "/start":
+                bool added = await Users.AddUserIfNotExist(update.Message.Chat.Id, update.Message.From?.Username ?? "");
+                if (added)
+                {
+                    await client.SendMessage(update.Message.Chat.Id, "Теперь ты в файлах Эйпштена, пидар.");
+                }
+                break;
+            case "/me":
+                await client.SendMessage(update.Message.Chat.Id, $"Твой id: {update.Message.Chat.Id}\nТвой ник: {update.Message.From?.Username ?? "Нет ника"}");
+                break;
+            default:
+                await client.SendMessage(update.Message?.Chat.Id ?? 445584914, update.Message?.Text ?? "[не текст]");
+                break;
+        } 
     }
 }
