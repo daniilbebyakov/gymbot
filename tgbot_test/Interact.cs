@@ -7,17 +7,23 @@ using Telegram.Bot.Types;
 
 namespace tgbot_test
 {
-    internal class Interact
+    public class Interact
     {
-        static UserRepository Users = new UserRepository();
-        public static async void OnMessage(ITelegramBotClient client, Update update)
+        private readonly UserRepository _user;
+
+        public Interact(UserRepository user)
+        {
+            _user = user;
+        }
+
+        public async Task OnMessage(ITelegramBotClient client, Update update)
         {
             if (update.Message == null) return;
             string usermessage = update.Message.Text ?? "";
             switch (usermessage)
             {
                 case "/start":
-                    bool added = await Users.AddUserIfNotExist(update.Message.Chat.Id, update.Message.From?.Username ?? "");
+                    bool added = await _user.AddUserIfNotExist(update.Message.Chat.Id, update.Message.From?.Username ?? "");
                     if (added)
                     {
                         await client.SendMessage(update.Message.Chat.Id, "Теперь ты в файлах Эйпштена, пидар.");
