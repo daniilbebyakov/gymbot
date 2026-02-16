@@ -11,9 +11,9 @@ internal class Program
     {
         var context = new GymBotContext();
         context.Database.EnsureCreated(); // костыль с бд
-        var userRep=new UserRepository(context);
+        var userRep=new UserRepository(context); // автоформатирование
         var interact = new Interact(userRep);
-        Host gymbot = new Host(Hidden.token, userRep, interact);
+        Host gymbot = new Host(Hidden.token, userRep, interact); // зачем разный тип данных либо вар либо везде прописывать. 
         gymbot.Start();
         Console.ReadLine(); 
     } 
