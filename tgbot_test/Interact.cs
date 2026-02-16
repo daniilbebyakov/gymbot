@@ -19,21 +19,21 @@ namespace tgbot_test
         public async Task OnMessage(ITelegramBotClient client, Update update)
         {
             if (update.Message == null) return;
-            string usermessage = update.Message.Text ?? "";
+            string usermessage = update.Message.Text ?? ""; // String.Empty
             switch (usermessage)
             {
-                case "/start":
-                    bool added = await _user.AddUserIfNotExist(update.Message.Chat.Id, update.Message.From?.Username ?? "");
+                case "/start": // вынести в контсатанты 
+                    bool added = await _user.AddUserIfNotExist(update.Message.Chat.Id, update.Message.From?.Username ?? ""); // String.Empty
                     if (added)
                     {
-                        await client.SendMessage(update.Message.Chat.Id, "Теперь ты в файлах Эйпштена, пидар.");
+                        await client.SendMessage(update.Message.Chat.Id, "Теперь ты в файлах Эйпштена, пидар."); // вынести в константы
                     }
                     break;
                 case "/me":
                     await client.SendMessage(update.Message.Chat.Id, $"Твой id: {update.Message.Chat.Id}\nТвой ник: {update.Message.From?.Username ?? "Нет ника"}");
                     break;
                 default:
-                    await client.SendMessage(update.Message?.Chat.Id ?? 445584914, update.Message?.Text ?? "[не текст]");
+                    await client.SendMessage(update.Message?.Chat.Id ?? 445584914, update.Message?.Text ?? "[не текст]"); // 445584914 что за хуйня 
                     break;
             }
         }
