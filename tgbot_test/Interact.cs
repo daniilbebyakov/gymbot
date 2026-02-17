@@ -7,7 +7,7 @@ using Telegram.Bot;
 using Telegram.Bot.Types;
 using static GymBot.Common.Constants.BotCommands;
 using static GymBot.Common.Constants.ToUserMessage;
-using static GymBot.Common.Constants.BotMessages
+using static GymBot.Common.Constants.BotMessages;
 
 namespace GymBot
 {
@@ -37,7 +37,7 @@ namespace GymBot
                     await client.SendMessage(update.Message.Chat.Id, string.Format(ToUserMessage.UserInfo, update.Message.Chat.Id, update.Message.From?.Username ?? "Нет ника"));
                     break;
                 default:
-                    await client.SendMessage(update.Message?.Chat.Id ?? 445584914, update.Message?.Text ?? BotMessages.BotMessageNoText);
+                    await client.SendMessage(update.Message.Chat.Id, update.Message?.Text ?? BotMessages.BotMessageNoText);
                     break;
             }
         }
