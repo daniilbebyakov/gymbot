@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="C:\Users\Даниил\GymBot.Data\GymBot.Data.csproj" />
+    <ProjectReference Include="E:\VS\Projects\gymbot_db\GymBot.Data.csproj" />
   </ItemGroup>
 
 </Project>

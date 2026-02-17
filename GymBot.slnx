@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="../gymbot_db/GymBot.Data.csproj" />
+  <Project Path="tgbot_test/GymBot.csproj" />
+</Solution>

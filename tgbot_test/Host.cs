@@ -1,12 +1,10 @@
 ﻿using GymBot.Data;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
+using static GymBot.Common.Constants.BotMessages;
 
-namespace tgbot_test
+namespace GymBot
 {
 
     public class Host
@@ -24,20 +22,20 @@ namespace tgbot_test
         public void Start()
         {
             _bot.StartReceiving(UpdateHandler, ErrorHandler);
-            Console.WriteLine("Бот запущен");
+            Console.WriteLine(BotStarted);
         }
 
         private async Task ErrorHandler(ITelegramBotClient client, Exception exception, HandleErrorSource source, CancellationToken token)
         {
-            Console.WriteLine("Ошибка: "+exception.Message);
+            Console.WriteLine(BotError + exception.Message);
             await Task.CompletedTask;
         }
 
         private async Task UpdateHandler(ITelegramBotClient client, Update update, CancellationToken token)
         {
-            Console.WriteLine($"Пришло сообщение: {update.Message?.Text ?? "не текст"}");
-            if (_interact!=null)
-                await _interact.OnMessage(client,update);
+            Console.WriteLine(BotNewMessage + update.Message?.Text ?? BotMessageNoText);
+            if (_interact != null)
+                await _interact.OnMessage(client, update);
             await Task.CompletedTask;
         }
     }
