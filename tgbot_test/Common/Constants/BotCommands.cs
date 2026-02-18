@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace GymBot.Common.Constants
+﻿namespace GymBot.Common.Constants
 {
     public static class BotCommands
     {

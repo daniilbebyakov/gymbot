@@ -1,8 +1,5 @@
 ﻿using GymBot.Common.Constants;
 using GymBot.Data;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using static GymBot.Common.Constants.BotCommands;
