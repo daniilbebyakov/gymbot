@@ -1,5 +1,6 @@
 ﻿using GymBot;
-using GymBot.Data;
+using GymBot.Data.Data;
+using GymBot.Data.Data.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 internal class Program

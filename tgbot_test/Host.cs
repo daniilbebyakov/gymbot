@@ -1,4 +1,4 @@
-﻿using GymBot.Data;
+﻿using GymBot.Data.Data.Repositories;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
