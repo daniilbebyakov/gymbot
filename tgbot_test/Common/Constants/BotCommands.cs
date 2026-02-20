@@ -4,7 +4,6 @@
     {
         public const string Start = "/start";
         public const string Me = "/me";
-        public const string CreateWorkout = "/workout";
-        public const string AddExercise = "/exercise";
+        public const string AddWorkout = "/addworkout";
     }
 }
