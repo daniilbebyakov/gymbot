@@ -10,7 +10,8 @@ internal class Program
         var context = new GymBotContext();
         context.Database.Migrate();
         var userRep = new UserRepository(context);
-        var interact = new Interact(userRep);
+        var workoutRep= new WorkoutRepository(context);
+        var interact = new Interact(userRep, workoutRep);
         Host gymbot = new Host(Hidden.token, userRep, interact);
         gymbot.Start();
         Console.ReadLine();
