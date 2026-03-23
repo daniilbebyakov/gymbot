@@ -11,7 +11,8 @@ internal class Program
         context.Database.Migrate();
         var userRep = new UserRepository(context);
         var workoutRep= new WorkoutRepository(context);
-        var interact = new Interact(userRep, workoutRep);
+        var wTemplateRep = new TemplateRepository(context);
+        var interact = new Interact(userRep, workoutRep, wTemplateRep);
         Host gymbot = new Host(Hidden.token, userRep, interact);
         gymbot.Start();
         Console.ReadLine();
