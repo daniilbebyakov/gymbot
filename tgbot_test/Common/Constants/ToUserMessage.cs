@@ -1,6 +1,4 @@
-﻿using static System.Collections.Specialized.BitVector32;
-
-namespace GymBot.Common.Constants
+﻿namespace GymBot.Common.Constants
 {
     public static class ToUserMessage
     {
@@ -38,8 +36,5 @@ namespace GymBot.Common.Constants
             $"Упражнение сохранено. В тренировке уже {exercisesCount} шт. Добавить ещё или сохранить тренировку?";
 
         public const string WorkoutCannotSaveWithoutExercises = "Нельзя сохранить пустую тренировку. Добавьте хотя бы одно упражнение.";
-        public const string IsNullOrWhiteSpaceWorkOutTemplatePrompt = "Название шаблона не может быть пустым.";
-        public static string ExerciseTemplateAddPrompt(int exerciseTempCount) => $"Упражнение добавлено. В шаблоне уже {exerciseTempCount}.";
-        public const string AddNameExerciseTemplatePrompt = "Введите название упражнения.";
     }
 }
