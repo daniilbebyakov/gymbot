@@ -17,12 +17,15 @@
         public const string CustomDatePrompt = "Введите дату в формате ДД.ММ.ГГГГ (например, 21.03.2026).";
         public const string InvalidDatePrompt = "Некорректная дата. Введите в формате ДД.ММ.ГГГГ.";
 
-        public const string WorkoutTypePrompt = "Выберите тип тренировки: A/B/C или свой шаблон.";
-        public const string CustomWorkoutTemplatePrompt = "Введите название своего шаблона тренировки (например, Ноги+Пресс).";
+        public const string WorkoutTypePrompt = "Выберите шаблон тренировки.";
+        public const string CustomWorkoutTemplatePrompt = "Введите название шаблона (например, Ноги+Пресс).";
 
-        public const string ExercisePrompt = "Выберите упражнение из списка кнопок или создайте своё.";
-        public const string CustomExercisePrompt = "Введите название своего упражнения.";
+        public const string ExercisePrompt = "Выберите упражнение из списка.";
+        public const string CustomExercisePrompt = "Введите название упражнения.";
+        public const string ExerciseAddedPrompt = "Упражнение добавлено";
 
+        public const string WorkoutTemplateCannotSave = "Введите название и минимум одно упражнение";
+        public const string WorkoutTemplateSaved = "Шаблон сохранён";
         public static string WeightPromptForExercise(string exerciseName) => $"Введите вес для упражнения \"{exerciseName}\" в кг (например, 80 или 80.5).";
         public const string InvalidWeightPrompt = "Некорректный вес. Введите число больше 0.";
 
