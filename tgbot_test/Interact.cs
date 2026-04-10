@@ -1,7 +1,7 @@
 ﻿using GymBot.Common.Constants;
 using GymBot.Data;
 using GymBot.Data.Data.Repositories;
-using System.Globalization; 
+using System.Globalization;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
@@ -40,7 +40,7 @@ namespace GymBot
         {
             public AddWorkoutStep Step { get; set; }
             public DateOnly WorkoutDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
-            public string WorkoutTemplate { get; set; }  = string.Empty;
+            public string WorkoutTemplate { get; set; } = string.Empty;
             public string? CurrentExerciseName { get; set; } = null;
             public decimal CurrentWeight { get; set; }
             public int CurrentReps { get; set; }
@@ -82,12 +82,12 @@ namespace GymBot
                     }
                     await client.SendMessage(chatId, StartMenuPrompt, replyMarkup: BuildStartKeyboard());
                     break;
-                case (Me):
-                    await client.SendMessage(chatId, string.Format(ToUserMessage.UserInfo,
-                        update.Message.Chat.Id, update.Message.From?.Username ?? "Нет ника"));
-                    break;
                 case (AddWorkout):
                     await StartAddWorkoutFlow(client, chatId);
+                    break;
+                case (WorkoutHistory):
+                    await _workout.GetWorkoutHistory(chatId, 0);
+                    await client.SendMessage(chatId, WorkoutHistoryTitle, replyMarkup: await BuildWorkoutHistoryKeyboard(chatId, 0));
                     break;
                 default:
                     await client.SendMessage(chatId, update.Message?.Text ?? BotMessages.BotMessageNoText);
@@ -105,13 +105,35 @@ namespace GymBot
                 await StartAddWorkoutFlow(client, chatId);
                 return;
             }
-            if (!_sessions.TryGetValue(chatId, out var session))
+
+            if (data == "start:view_history")
             {
-                await client.SendMessage(chatId, SessionExpired, replyMarkup: BuildStartKeyboard());
+                var wcount=await _workout.GetWorkoutHistoryCount(chatId);
+                if (wcount < 1)
+                {
+                    await client.SendMessage(chatId, WorkoutHistoryEmpty, replyMarkup: BuildStartKeyboard());
+                    return;
+                }
+                    await client.SendMessage(chatId, WorkoutHistoryTitle, replyMarkup: await BuildWorkoutHistoryKeyboard(chatId, 0));
                 return;
             }
+            if (data.StartsWith("history:page:"))
+            {
+                if (int.TryParse(data.Replace("history:page:", string.Empty), out var page))
+                {
+                    await _workout.GetWorkoutHistory(chatId, page);
+                    await client.SendMessage(chatId, WorkoutHistoryTitle, replyMarkup: await BuildWorkoutHistoryKeyboard(chatId, page));
+                }
+                return;
+            }
+
             if (data == "template:create")
             {
+                if (!_sessions.TryGetValue(chatId, out var session))
+                {
+                    await client.SendMessage(chatId, SessionExpired, replyMarkup: BuildStartKeyboard());
+                    return;
+                }
                 session.IsTemplateCreationMode = true;
                 session.NewTemplateName = null;
                 session.NewTemplateExercises.Clear();
@@ -119,13 +141,23 @@ namespace GymBot
                 await client.SendMessage(chatId, CustomWorkoutTemplatePrompt, replyMarkup: BuildNavigationOnlyKeyboard());
                 return;
             }
-            if (data =="template:add_exercise")
+            if (data == "template:add_exercise")
             {
+                if (!_sessions.TryGetValue(chatId, out var session))
+                {
+                    await client.SendMessage(chatId, SessionExpired, replyMarkup: BuildStartKeyboard());
+                    return;
+                }
                 session.Step = AddWorkoutStep.CreatingTemplateExercise;
                 await client.SendMessage(chatId, CustomExercisePrompt, replyMarkup: BuildNavigationOnlyKeyboard());
             }
             if (data == "template:save")
             {
+                if (!_sessions.TryGetValue(chatId, out var session))
+                {
+                    await client.SendMessage(chatId, SessionExpired, replyMarkup: BuildStartKeyboard());
+                    return;
+                }
                 if (string.IsNullOrWhiteSpace(session.NewTemplateName) || session.NewTemplateExercises.Count == 0)
                 {
                     await client.SendMessage(chatId, WorkoutTemplateCannotSave);
@@ -134,23 +166,113 @@ namespace GymBot
                 var templateId = await _template.CreateTemplate(
                     chatId, session.NewTemplateName, session.NewTemplateExercises);
                 session.IsTemplateCreationMode = false;
-                session.Step=AddWorkoutStep.ChooseWorkoutTemplate;
+                session.Step = AddWorkoutStep.ChooseWorkoutTemplate;
                 await client.SendMessage(chatId, WorkoutTemplateSaved, replyMarkup: await BuildWorkoutTypeKeyboard(chatId));
+                return;
+            }
+            if (data.StartsWith("history:delete:"))
+            {
+                if (!long.TryParse(data.Replace("history:delete:", string.Empty), out var workoutId))
+                {
+                    await client.SendMessage(chatId, WorkoutDeleteError, replyMarkup: await BuildWorkoutHistoryKeyboard(chatId, 0));
+                    return;
+                }
+                await client.SendMessage(
+                    chatId,
+                    WorkoutTemplateDeleteConfirm,
+                    replyMarkup: BuildWorkoutDeleteConfirmKeyboard(workoutId));
+                return;
+            }
+            if (data.StartsWith("workout:delete_confirm:"))
+            {
+                if (!long.TryParse(data.Replace("workout:delete_confirm:", string.Empty), out var workoutId))
+                {
+                    await client.SendMessage(chatId, WorkoutDeleteError, replyMarkup: await BuildWorkoutHistoryKeyboard(chatId, 0));
+                    return;
+                }
+                try
+                {
+                    await _workout.DeleteWorkout(chatId, workoutId);
+                    await client.SendMessage(chatId, WorkoutDeleted, replyMarkup: await BuildWorkoutHistoryKeyboard(chatId, 0));
+                }
+                catch
+                {
+                    await client.SendMessage(chatId, WorkoutDeleteError, replyMarkup: await BuildWorkoutHistoryKeyboard(chatId, 0));
+                }
+            }
+            if (data == "workout:delete_cancel")
+            {
+                await client.SendMessage(chatId, WorkoutDeletedCanceled, replyMarkup: await BuildWorkoutHistoryKeyboard(chatId, 0));
+                return;
+            }
+            if (data.StartsWith("template:delete:"))
+            {
+                if (!long.TryParse(data.Replace("template:delete:", string.Empty), out var templateId))
+                {
+                    await client.SendMessage(chatId, UnknownStatePrompt, replyMarkup: await BuildWorkoutTypeKeyboard(chatId));
+                    return;
+                }
+
+                var templateToDelete = await _template.GetTemplate(templateId, chatId);
+                if (templateToDelete == null)
+                {
+                    await client.SendMessage(chatId, UnknownStatePrompt, replyMarkup: await BuildWorkoutTypeKeyboard(chatId));
+                    return;
+                }
+
+                await client.SendMessage(
+                    chatId,
+                    string.Format(WorkoutTemplateDeleteConfirm, templateToDelete.Name),
+                    replyMarkup: BuildTemplateDeleteConfirmKeyboard(templateId));
+                return;
+            }
+            if (data.StartsWith("template:delete_confirm:"))
+            {
+                if (!long.TryParse(data.Replace("template:delete_confirm:", string.Empty), out var templateId))
+                {
+                    await client.SendMessage(chatId, UnknownStatePrompt, replyMarkup: await BuildWorkoutTypeKeyboard(chatId));
+                    return;
+                }
+
+                try
+                {
+                    await _template.DeleteTemplate(templateId, chatId);
+                    await client.SendMessage(chatId, WorkoutTemplateDeleted, replyMarkup: await BuildWorkoutTypeKeyboard(chatId));
+                }
+                catch
+                {
+                    await client.SendMessage(chatId, WorkoutTemplateDeleteCancel, replyMarkup: await BuildWorkoutTypeKeyboard(chatId));
+                }
+                return;
+            }
+            if (data == "template:delete_cancel")
+            {
+                await client.SendMessage(chatId, WorkoutTemplateDeleteCancel, replyMarkup: await BuildWorkoutTypeKeyboard(chatId));
                 return;
             }
             if (data == "nav:cancel")
             {
                 _sessions.Remove(chatId);
-                await client.SendMessage(chatId, FlowCanceled, replyMarkup: BuildStartKeyboard());
+                await client.SendMessage(chatId, BackToMainMenu, replyMarkup: BuildStartKeyboard());
                 return;
             }
             if (data == "nav:back")
             {
+                if (!_sessions.TryGetValue(chatId, out var session))
+                {
+                    await client.SendMessage(chatId, SessionExpired, replyMarkup: BuildStartKeyboard());
+                    return;
+                }
                 await HandleBack(client, chatId, session);
                 return;
             }
             if (data == "date:today")
             {
+                if (!_sessions.TryGetValue(chatId, out var session))
+                {
+                    await client.SendMessage(chatId, SessionExpired, replyMarkup: BuildStartKeyboard());
+                    return;
+                }
                 session.WorkoutDate = DateOnly.FromDateTime(DateTime.Today);
                 session.Step = AddWorkoutStep.ChooseWorkoutTemplate;
                 await client.SendMessage(chatId, WorkoutTypePrompt, replyMarkup: await BuildWorkoutTypeKeyboard(chatId));
@@ -158,18 +280,28 @@ namespace GymBot
             }
             if (data == "date:custom")
             {
+                if (!_sessions.TryGetValue(chatId, out var session))
+                {
+                    await client.SendMessage(chatId, SessionExpired, replyMarkup: BuildStartKeyboard());
+                    return;
+                }
                 session.Step = AddWorkoutStep.WaitingCustomDate;
                 await client.SendMessage(chatId, CustomDatePrompt, replyMarkup: BuildNavigationOnlyKeyboard());
                 return;
             }
             if (data.StartsWith("wtemplate:"))
             {
+                if (!_sessions.TryGetValue(chatId, out var session))
+                {
+                    await client.SendMessage(chatId, SessionExpired, replyMarkup: BuildStartKeyboard());
+                    return;
+                }
                 if (!long.TryParse(data.Replace("wtemplate:", string.Empty), out var templateId))
                 {
                     await client.SendMessage(chatId, UnknownStatePrompt, replyMarkup: await BuildWorkoutTypeKeyboard(chatId));
                     return;
                 }
-                var selectedTemplate = await _template.GetTemplate(templateId,chatId);
+                var selectedTemplate = await _template.GetTemplate(templateId, chatId);
                 if (selectedTemplate == null)
                 {
                     await client.SendMessage(chatId, UnknownStatePrompt, replyMarkup: await BuildWorkoutTypeKeyboard(chatId));
@@ -177,7 +309,7 @@ namespace GymBot
                 }
                 session.WorkoutTemplate = selectedTemplate.Name;
                 session.PreferredExercises.Clear();
-                session.PreferredExercises.AddRange(selectedTemplate.Exercises.Select(e=>e.ExerciseName));
+                session.PreferredExercises.AddRange(selectedTemplate.Exercises.Select(e => e.ExerciseName));
                 session.Step = AddWorkoutStep.ChooseExercise;
                 await client.SendMessage(chatId,
                     ExercisePrompt,
@@ -186,6 +318,11 @@ namespace GymBot
             }
             if (data == "exercise:add_more")
             {
+                if (!_sessions.TryGetValue(chatId, out var session))
+                {
+                    await client.SendMessage(chatId, SessionExpired, replyMarkup: BuildStartKeyboard());
+                    return;
+                }
                 session.CurrentExerciseName = null;
                 session.CurrentWeight = 0;
                 session.CurrentReps = 0;
@@ -195,6 +332,11 @@ namespace GymBot
             }
             if (data.StartsWith("exercise:"))
             {
+                if (!_sessions.TryGetValue(chatId, out var session))
+                {
+                    await client.SendMessage(chatId, SessionExpired, replyMarkup: BuildStartKeyboard());
+                    return;
+                }
                 string exercise = data.Replace("exercise:", string.Empty);
                 session.CurrentExerciseName = exercise;
                 session.Step = AddWorkoutStep.WaitingWeight;
@@ -203,6 +345,11 @@ namespace GymBot
             }
             if (data == "workout:save")
             {
+                if (!_sessions.TryGetValue(chatId, out var session))
+                {
+                    await client.SendMessage(chatId, SessionExpired, replyMarkup: BuildStartKeyboard());
+                    return;
+                }
                 if (session.Exercises.Count == 0)
                 {
                     await client.SendMessage(chatId, WorkoutCannotSaveWithoutExercises, replyMarkup: BuildExerciseActionsKeyboard());
@@ -253,11 +400,11 @@ namespace GymBot
                     session.Step = AddWorkoutStep.ChooseWorkoutTemplate;
                     session.NewTemplateName = null;
                     session.NewTemplateExercises.Clear();
-                    await client.SendMessage(chatId,"blabla",replyMarkup: await BuildWorkoutTypeKeyboard(chatId));
+                    await client.SendMessage(chatId, WorkoutTypePrompt, replyMarkup: await BuildWorkoutTypeKeyboard(chatId));
                     break;
-                    case AddWorkoutStep.CreatingTemplateExercise:
+                case AddWorkoutStep.CreatingTemplateExercise:
                     session.Step = AddWorkoutStep.ChooseWorkoutTemplate;
-                    await client.SendMessage(chatId, "al", replyMarkup: BuildTemplateDraftKeyboard());
+                    await client.SendMessage(chatId, WorkoutTypePrompt, replyMarkup: BuildTemplateDraftKeyboard());
                     break;
                 case AddWorkoutStep.ChooseExercise:
                     session.Step = AddWorkoutStep.ChooseWorkoutTemplate;
@@ -329,16 +476,16 @@ namespace GymBot
                     }
                     session.NewTemplateName = text.Trim();
                     session.NewTemplateExercises.Clear();
-                    session.Step=AddWorkoutStep.CreatingTemplateExercise;
+                    session.Step = AddWorkoutStep.CreatingTemplateExercise;
                     await client.SendMessage(chatId, CustomExercisePrompt, replyMarkup: BuildNavigationOnlyKeyboard());
                     break;
-                    case AddWorkoutStep.CreatingTemplateExercise:
-                        if (string.IsNullOrWhiteSpace(text))
+                case AddWorkoutStep.CreatingTemplateExercise:
+                    if (string.IsNullOrWhiteSpace(text))
                     {
                         await client.SendMessage(chatId, CustomExercisePrompt, replyMarkup: BuildNavigationOnlyKeyboard());
                         return;
                     }
-                        session.NewTemplateExercises.Add(text.Trim());
+                    session.NewTemplateExercises.Add(text.Trim());
                     await client.SendMessage(chatId, ExerciseAddedPrompt, replyMarkup: BuildTemplateDraftKeyboard());
                     break;
                 case AddWorkoutStep.WaitingCustomExercise:
@@ -420,8 +567,37 @@ namespace GymBot
         }
         private static InlineKeyboardMarkup BuildStartKeyboard() => new(
         [
-            [InlineKeyboardButton.WithCallbackData("➕ Добавить тренировку", "start:add_workout")]
+            [InlineKeyboardButton.WithCallbackData("➕ Добавить тренировку", "start:add_workout")],
+            [InlineKeyboardButton.WithCallbackData("📚 История тренировок", "start:view_history")]
         ]);
+        private async Task<InlineKeyboardMarkup> BuildWorkoutHistoryKeyboard(long chatId, int currentPage)
+        {
+            var workouts = await _workout.GetWorkoutHistory(chatId, currentPage);
+            var workoutcount = await _workout.GetWorkoutHistoryCount(chatId);
+            var totalPages = (int)Math.Ceiling((double)workoutcount / 5);
+            var rows = workouts
+                .Select(w => new[]
+                { InlineKeyboardButton.WithCallbackData($"{w.Date:dd.MM}, Шаблон: {w.Name}",$"whistory:{w.Id}"),
+                    InlineKeyboardButton.WithCallbackData("🗑 Удалить", $"history:delete:{w.Id}")
+                })
+                .ToList();
+            var navigationRow = new List<InlineKeyboardButton>();
+            if (currentPage > 0)
+            {
+                navigationRow.Add(InlineKeyboardButton.WithCallbackData("⬅️", $"history:page:{currentPage - 1}"));
+            }
+            if (currentPage + 1 < totalPages)
+            {
+                navigationRow.Add(InlineKeyboardButton.WithCallbackData("➡️", $"history:page:{currentPage + 1}"));
+            }
+            if (navigationRow.Count > 0)
+            {
+                rows.Add(navigationRow.ToArray());
+            }
+
+            rows.Add([InlineKeyboardButton.WithCallbackData("⬅️ В меню", "nav:cancel")]);
+            return new InlineKeyboardMarkup(rows);
+        }
         private static InlineKeyboardMarkup BuildDateKeyboard() => new(
         [
             [InlineKeyboardButton.WithCallbackData("📌 Сегодня", "date:today")],
@@ -432,12 +608,23 @@ namespace GymBot
         {
             var customTemplates = await _template.GetUserTemplates(chatId);
             var rows = customTemplates
-                .Select(x => new[] { InlineKeyboardButton.WithCallbackData($"📌 {x.Name}",$"wtemplate:{x.Id}") })
+                .Select(x => new[] { InlineKeyboardButton.WithCallbackData($"📌 {x.Name}",$"wtemplate:{x.Id}"),
+                InlineKeyboardButton.WithCallbackData("🗑 Удалить", $"template:delete:{x.Id}")})
                 .ToList();
             rows.Add([InlineKeyboardButton.WithCallbackData("➕ Создать шаблон", "template:create")]);
             rows.AddRange(BuildNavigationRow());
             return new InlineKeyboardMarkup(rows);
         }
+        private static InlineKeyboardMarkup BuildTemplateDeleteConfirmKeyboard(long templateId) => new(
+        [
+            [InlineKeyboardButton.WithCallbackData("✅ Да, удалить", $"template:delete_confirm:{templateId}")],
+            [InlineKeyboardButton.WithCallbackData("↩️ Нет, оставить", "template:delete_cancel")]
+        ]);
+        private static InlineKeyboardMarkup BuildWorkoutDeleteConfirmKeyboard(long workoutId) => new(
+        [
+            [InlineKeyboardButton.WithCallbackData("✅ Да, удалить", $"workout:delete_confirm:{workoutId}")],
+            [InlineKeyboardButton.WithCallbackData("↩️ Нет, оставить", "workout:delete_cancel")]
+        ]);
         private static InlineKeyboardMarkup BuildExerciseKeyboard(IReadOnlyCollection<string> preferredExercises)
         {
             var rows = new List<InlineKeyboardButton[]>();
@@ -472,7 +659,7 @@ namespace GymBot
         {
             var header = $"✅ Тренировка сохранена \nДата: {session.WorkoutDate:dd.MM.yyyy}\nШаблон: {session.WorkoutTemplate}";
             var lines = session.Exercises
-                .Select((x, i) => $"{i + 1}. {x.Name} — {x.Weight} кг × {x.Reps} повторений × {x.Sets} подходов")
+                .Select((x, i) => $"{i + 1}. {x.Name} — {x.Weight} кг × {x.Reps} повторений × {x.Sets} подхода")
                 .ToList();
 
             return string.Join('\n', [header, "", "Упражнения:", .. lines]);

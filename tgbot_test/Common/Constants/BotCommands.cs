@@ -3,7 +3,7 @@
     public static class BotCommands
     {
         public const string Start = "/start";
-        public const string Me = "/me";
         public const string AddWorkout = "/addworkout";
+        public const string WorkoutHistory = "/workouthistory";
     }
 }
