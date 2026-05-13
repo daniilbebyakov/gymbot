@@ -1,6 +1,8 @@
 ﻿using GymBot.Common.Constants;
 using GymBot.Data;
 using GymBot.Data.Data.Repositories;
+using OfficeOpenXml;
+using OfficeOpenXml.Drawing.Chart;
 using System.Globalization;
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -115,6 +117,11 @@ namespace GymBot
                     return;
                 }
                     await client.SendMessage(chatId, WorkoutHistoryTitle, replyMarkup: await BuildWorkoutHistoryKeyboard(chatId, 0));
+                return;
+            }
+            if (data == "start:progress_report")
+            {
+                await BuildAndSendProgressReport(client, chatId);
                 return;
             }
             if (data.StartsWith("history:page:"))
@@ -568,7 +575,8 @@ namespace GymBot
         private static InlineKeyboardMarkup BuildStartKeyboard() => new(
         [
             [InlineKeyboardButton.WithCallbackData("➕ Добавить тренировку", "start:add_workout")],
-            [InlineKeyboardButton.WithCallbackData("📚 История тренировок", "start:view_history")]
+            [InlineKeyboardButton.WithCallbackData("📚 История тренировок", "start:view_history")],
+            [InlineKeyboardButton.WithCallbackData("📈 Сформировать график прогресса", "start:progress_report")]
         ]);
         private async Task<InlineKeyboardMarkup> BuildWorkoutHistoryKeyboard(long chatId, int currentPage)
         {
@@ -663,6 +671,112 @@ namespace GymBot
                 .ToList();
 
             return string.Join('\n', [header, "", "Упражнения:", .. lines]);
+        }
+        private async Task BuildAndSendProgressReport(ITelegramBotClient client, long chatId)
+        {
+            // 1) Получаем отчет из репозитория
+            var report = await _workout.BuildWeightProgressReport(chatId);
+
+            // 2) Отправляем как .xlsx документ в Telegram
+            await using var stream = new MemoryStream(report);
+
+            await client.SendDocument(
+                chatId: chatId,
+                document: InputFile.FromStream(stream, "график прогресса.xlsx"),
+                caption: "График прогресса веса за весь период"
+            );
+            //try
+            //{
+            //    await client.SendMessage(chatId, ProgressReportBuilding, replyMarkup: BuildStartKeyboard());
+
+            //    var fileBytes = await WorkoutRepository.BuildWeightProgressReport(chatId);
+
+            //    var workoutCount = await _workout.GetWorkoutHistoryCount(chatId);
+            //    if (workoutCount <= 0)
+            //    {
+            //        await client.SendMessage(chatId, ProgressReportEmpty, replyMarkup: BuildStartKeyboard());
+            //        return;
+            //    }
+
+            //    var allWorkouts = new List<dynamic>();
+            //    var totalPages = (int)Math.Ceiling((double)workoutCount / 5);
+            //    for (var page = 0; page < totalPages; page++)
+            //    {
+            //        var pageItems = await _workout.GetWorkoutHistory(chatId, page);
+            //        allWorkouts.AddRange(pageItems.Cast<dynamic>());
+            //    }
+
+            //    var pointsByExercise = new Dictionary<string, List<(DateTime Date, decimal Weight)>>();
+
+            //    foreach (var workout in allWorkouts)
+            //    {
+            //        DateTime workoutDate = ((DateOnly)workout.Date).ToDateTime(TimeOnly.MinValue);
+            //        foreach (var exercise in workout.Exercises)
+            //        {
+            //            string exerciseName = exercise.Name;
+            //            decimal weight = exercise.Weight;
+
+            //            if (!pointsByExercise.TryGetValue(exerciseName, out var list))
+            //            {
+            //                list = [];
+            //                pointsByExercise[exerciseName] = list;
+            //            }
+
+            //            list.Add((workoutDate, weight));
+            //        }
+            //    }
+
+            //    if (pointsByExercise.Count == 0)
+            //    {
+            //        await client.SendMessage(chatId, ProgressReportEmpty, replyMarkup: BuildStartKeyboard());
+            //        return;
+            //    }
+
+            //    ExcelPackage.License.SetNonCommercialPersonal("Danya");
+            //    string tempFile = Path.Combine(Path.GetTempPath(), $"weight-progress-{chatId}-{DateTime.UtcNow:yyyyMMddHHmmss}.xlsx");
+
+            //    using (var package = new ExcelPackage())
+            //    {
+            //        foreach (var pair in pointsByExercise.OrderBy(x => x.Key))
+            //        {
+            //            var sheetName = pair.Key.Length > 31 ? pair.Key[..31] : pair.Key;
+            //            var sheet = package.Workbook.Worksheets.Add(sheetName);
+
+            //            sheet.Cells[1, 1].Value = "Дата";
+            //            sheet.Cells[1, 2].Value = "Вес (кг)";
+
+            //            var ordered = pair.Value.OrderBy(x => x.Date).ToList();
+            //            for (int i = 0; i < ordered.Count; i++)
+            //            {
+            //                sheet.Cells[i + 2, 1].Value = ordered[i].Date;
+            //                sheet.Cells[i + 2, 1].Style.Numberformat.Format = "dd.MM.yyyy";
+            //                sheet.Cells[i + 2, 2].Value = ordered[i].Weight;
+            //            }
+
+            //            var chart = sheet.Drawings.AddChart($"chart_{sheetName}", eChartType.LineMarkers) as ExcelLineChart;
+            //            chart!.Title.Text = $"Прогресс веса: {pair.Key}";
+            //            chart.SetPosition(0, 0, 3, 0);
+            //            chart.SetSize(900, 360);
+            //            var series = chart.Series.Add(sheet.Cells[2, 2, ordered.Count + 2 - 1, 2], sheet.Cells[2, 1, ordered.Count + 2 - 1, 1]);
+            //            series.Header = "Вес";
+            //            chart.YAxis.Title.Text = "Вес (кг)";
+            //            chart.XAxis.Title.Text = "Дата";
+
+            //            sheet.Cells[sheet.Dimension.Address].AutoFitColumns();
+            //        }
+
+            //        await package.SaveAsAsync(new FileInfo(tempFile));
+            //    }
+
+            //    await using var stream = File.OpenRead(tempFile);
+            //    await client.SendDocument(chatId, InputFile.FromStream(stream, "weight-progress-report.xlsx"));
+            //    await client.SendMessage(chatId, ProgressReportReady, replyMarkup: BuildStartKeyboard());
+            //    File.Delete(tempFile);
+            //}
+            //catch
+            //{
+            //    await client.SendMessage(chatId, ProgressReportError, replyMarkup: BuildStartKeyboard());
+            //}
         }
     }
 }

@@ -50,5 +50,9 @@
         public const string WorkoutDeleteError = "Не удалось удалить тренировку.";
         public const string WorkoutDeleteConfirm = "Вы действительно хотите удалить тренировку?";
         public const string WorkoutDeletedCanceled = "Удаление тренировки отменено.";
+        public const string ProgressReportBuilding = "Формирую файл с графиком прогресса веса…";
+        public const string ProgressReportEmpty = "Недостаточно данных для отчёта. Добавьте тренировки с весами.";
+        public const string ProgressReportReady = "Готово! Ниже файл с графиками прогресса веса.";
+        public const string ProgressReportError = "Не удалось сформировать отчёт. Попробуйте позже.";
     }
 }
